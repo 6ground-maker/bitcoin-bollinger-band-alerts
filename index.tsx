@@ -7,10 +7,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
-// Service worker registration has been removed due to persistent, unrecoverable
-// errors within this specific sandboxed environment. The application is designed
-// to fall back to standard browser notifications, ensuring core functionality
-// remains intact without causing console errors.
+// Service Worker registration is disabled as it is blocked by the sandboxed environment.
+// The application will gracefully fall back to using standard browser notifications.
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

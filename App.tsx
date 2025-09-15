@@ -7,7 +7,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { fetchBitcoinHistory, fetchBitcoinPrice, calculateBollingerBands } from './services/geminiService';
 import Header from './components/Header';
 import Spinner from './components/Spinner';
-import { BellIcon, CheckCircleIcon, ExclamationTriangleIcon } from './components/icons';
+import { BellIcon, CheckCircleIcon, ExclamationTriangleIcon, ArrowPathIcon } from './components/icons';
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -15,10 +15,9 @@ const App: React.FC = () => {
   const [priceHistory, setPriceHistory] = useState<number[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [bbands, setBbands] = useState<{ upper: number, middle: number, lower: number } | null>(null);
-  // FIX: Widen the type of notificationStatus to include PermissionState
-  // to handle the 'prompt' value from the Permissions API.
   const [notificationStatus, setNotificationStatus] = useState<NotificationPermission | PermissionState>('default');
   const [alerts, setAlerts] = useState<{ message: string; time: string }[]>([]);
+  const [isPollingManually, setIsPollingManually] = useState(false);
   const lastAlertTime = useRef<number>(0);
   
   const COOLDOWN_PERIOD = 5 * 60 * 1000; // 5 minutes
@@ -52,6 +51,28 @@ const App: React.FC = () => {
     // The state will be updated by the `onchange` listener if Permissions API is supported,
     // but setting it here provides a faster UI update and a fallback.
     setNotificationStatus(permission);
+  };
+
+  const handleTestNotification = () => {
+    if (notificationStatus !== 'granted') {
+      console.warn('Cannot send test notification, permission not granted.');
+      return;
+    }
+  
+    const title = 'Test Notification';
+    const options = {
+      body: 'Success! Your browser is set up to receive alerts.',
+      icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👍</text></svg>',
+    };
+  
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+            type: 'SHOW_NOTIFICATION',
+            payload: { title, options }
+        });
+    } else {
+        new Notification(title, options);
+    }
   };
   
   const pollPrice = useCallback(async () => {
@@ -138,12 +159,18 @@ const App: React.FC = () => {
       if (intervalId) clearInterval(intervalId);
     };
   }, [pollPrice]);
+  
+  const handleManualPoll = async () => {
+    setIsPollingManually(true);
+    await pollPrice();
+    setIsPollingManually(false);
+  };
 
   const renderContent = () => {
     if (isLoading) {
       return (
         <div className="flex flex-col items-center justify-center gap-4 animate-fade-in">
-          <Spinner />
+          <Spinner className="h-16 w-16 text-gray-300" />
           <p className="text-gray-300">Loading Bitcoin price data...</p>
         </div>
       );
@@ -185,6 +212,26 @@ const App: React.FC = () => {
                       <p className="text-xl text-gray-200">${bbands ? bbands.lower.toLocaleString(undefined, {minimumFractionDigits: 2}) : '...'}</p>
                   </div>
               </div>
+
+              <div className="mt-6 border-t border-gray-700/80 pt-4">
+                  <button
+                      onClick={handleManualPoll}
+                      disabled={isPollingManually}
+                      className="w-full flex items-center justify-center gap-2 bg-gray-700/50 hover:bg-gray-600/50 border border-gray-600 text-gray-200 font-semibold py-2 px-4 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                      {isPollingManually ? (
+                          <>
+                              <Spinner className="h-5 w-5" />
+                              <span>Checking...</span>
+                          </>
+                      ) : (
+                          <>
+                              <ArrowPathIcon className="w-5 h-5"/>
+                              <span>Check Price Now</span>
+                          </>
+                      )}
+                  </button>
+              </div>
           </div>
           
           <div className="w-full bg-gray-800/50 border border-gray-700/80 rounded-xl p-6 backdrop-blur-sm shadow-2xl flex flex-col items-center">
@@ -195,9 +242,17 @@ const App: React.FC = () => {
                       Enable Notifications
                    </button>
                ) : (
-                  <div className="flex items-center gap-2 text-green-400">
-                      <CheckCircleIcon className="w-6 h-6"/>
-                      <p className="font-semibold">Notifications are active.</p>
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="flex items-center gap-2 text-green-400">
+                        <CheckCircleIcon className="w-6 h-6"/>
+                        <p className="font-semibold">Notifications are active.</p>
+                    </div>
+                    <button 
+                         onClick={handleTestNotification}
+                         className="bg-gray-700/50 hover:bg-gray-600/50 border border-gray-600 text-gray-200 font-bold py-2 px-4 rounded-lg text-sm transition-colors"
+                     >
+                         Send Test Notification
+                     </button>
                   </div>
                )}
                 {notificationStatus === 'denied' && <p className="text-sm text-yellow-400 mt-3 text-center">You've blocked notifications. Please enable them in your browser settings.</p>}
