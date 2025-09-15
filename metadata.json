@@ -1,0 +1,6 @@
+{
+  "name": "Bitcoin Bollinger Band Alerts",
+  "description": "A real-time Bitcoin price tracker that sends push notifications when the price touches the upper or lower Bollinger Bands.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
