@@ -15,11 +15,33 @@ const App: React.FC = () => {
   const [priceHistory, setPriceHistory] = useState<number[]>([]);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [bbands, setBbands] = useState<{ upper: number, middle: number, lower: number } | null>(null);
-  const [notificationStatus, setNotificationStatus] = useState(Notification.permission);
+  // FIX: Widen the type of notificationStatus to include PermissionState
+  // to handle the 'prompt' value from the Permissions API.
+  const [notificationStatus, setNotificationStatus] = useState<NotificationPermission | PermissionState>('default');
   const [alerts, setAlerts] = useState<{ message: string; time: string }[]>([]);
   const lastAlertTime = useRef<number>(0);
   
   const COOLDOWN_PERIOD = 5 * 60 * 1000; // 5 minutes
+
+  useEffect(() => {
+    if (!('Notification' in window)) {
+      console.warn('This browser does not support desktop notification');
+      return;
+    }
+  
+    // Use Permissions API for dynamic updates if available
+    if ('permissions' in navigator) {
+      navigator.permissions.query({ name: 'notifications' }).then((permissionStatus) => {
+        setNotificationStatus(permissionStatus.state);
+        permissionStatus.onchange = () => {
+          setNotificationStatus(permissionStatus.state);
+        };
+      });
+    } else {
+      // Fallback for older browsers
+      setNotificationStatus(Notification.permission);
+    }
+  }, []);
 
   const handleRequestPermission = async () => {
     if (!('Notification' in window)) {
@@ -27,6 +49,8 @@ const App: React.FC = () => {
       return;
     }
     const permission = await Notification.requestPermission();
+    // The state will be updated by the `onchange` listener if Permissions API is supported,
+    // but setting it here provides a faster UI update and a fallback.
     setNotificationStatus(permission);
   };
   
